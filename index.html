@@ -1160,6 +1160,10 @@ body.rotation-mode #btnBuildRotation{display:none;}
 .arp-order{color:#b8860b;font-weight:600;}
 .arp-agency-link{color:#1976d2;text-decoration:none;}
 .arp-region-cell{color:#555;}
+.arp-row-noaccess{background:#fafafa;}
+.arp-row-noaccess td{color:#b0b4bb;}
+.arp-noaccess-lbl{font-style:italic;}
+.arp-row-noaccess input[type=checkbox]{cursor:not-allowed;}
 .alloc-reject-hint{font-size:11.5px;color:#888;padding-top:4px;}
 .alloc-reject-hidden-note{font-size:11.5px;color:#8a8f98;font-style:italic;padding:6px 0 0;}
 .arp-chk-cell{text-align:center;}
@@ -1294,6 +1298,7 @@ body.rotation-mode #btnBuildRotation{display:none;}
 .pref-region-toggle .prt-eye{color:#9aa0a6;flex-shrink:0;}
 .pref-region-toggle .prt-text{font-size:12.5px;font-style:italic;color:#8a8f98;}
 .prp-row{display:flex;align-items:center;gap:6px;padding:4px 10px;font-size:12.5px;font-style:italic;color:#8a8f98;border-bottom:1px solid #f0f0f0;}
+.prp-row-noaccess{color:#b0b4bb;cursor:not-allowed;}
 
 /* Region bar for out-of-region preference groups — muted but bold, no colour tint, matches row-border convention */
 .pref-region-bar{display:flex;align-items:center;width:100%;border-bottom:1px solid #e8e8e8;padding-top:5px;padding-bottom:5px;}
@@ -2035,6 +2040,7 @@ body.rotation-mode .ward-alloc-badge{display:none!important;}
 .sp-subtitle{font-size:11px;color:#9ca3af;}
 .sp-body{flex:1;overflow-y:auto;padding:12px 16px;}
 .sp-prototype-note{background:#fffbea;border:1px solid #f0d478;border-radius:6px;padding:10px 12px;font-size:11.5px;color:#7a5c00;line-height:1.5;margin-bottom:12px;}
+.arp-scenario-note{background:#fffbea;border:1px solid #f0d478;border-radius:6px;padding:10px 12px;font-size:11.5px;color:#7a5c00;line-height:1.6;margin-top:12px;}
 .sp-prototype-note strong{font-weight:700;}
 .sp-footer{padding:12px 16px 14px;border-top:1px solid #e2e5ea;flex-shrink:0;}
 .sp-footer-actions{display:flex;gap:8px;}
@@ -3378,11 +3384,11 @@ const VICTORIA_REQS = [
      {order:2, agencyId:'sa-b', agencyName:'(SA) Agency B', status:'active', region:'Victoria'},
      {order:3, agencyId:'sa-c', agencyName:'(SA) Agency C', status:'active', region:'Victoria'},
      {order:4, agencyId:'act-a', agencyName:'(SA) Agency A', status:'active', outOfRegion:true, region:'ACT Metropolitan Hospitals'},
-     {order:5, agencyId:'nsw-b', agencyName:'(SA) Agency D', status:'active', outOfRegion:true, region:'New South Wales'},
-     {order:6, agencyId:'nsw-c', agencyName:'3.11.1 AT', status:'active', outOfRegion:true, region:'New South Wales'},
-     {order:7, agencyId:'wa-a',  agencyName:'A2022-00063', status:'active', outOfRegion:true, region:'Western Australia'},
-     {order:8, agencyId:'no-access-1', status:'active', noAccess:true},
-     {order:9, agencyId:'no-access-2', status:'active', noAccess:true},
+     {order:5, agencyId:'no-access-1', status:'active', noAccess:true},
+     {order:6, agencyId:'nsw-b', agencyName:'(SA) Agency D', status:'active', outOfRegion:true, region:'New South Wales'},
+     {order:7, agencyId:'no-access-2', status:'active', noAccess:true},
+     {order:8, agencyId:'nsw-c', agencyName:'3.11.1 AT', status:'active', outOfRegion:true, region:'New South Wales'},
+     {order:9, agencyId:'wa-a',  agencyName:'A2022-00063', status:'active', outOfRegion:true, region:'Western Australia'},
    ],
    currentAgencyId:'hope',
    // Per-day roster: Mon→AM, Tue→PM, Wed→AM  (indices relative to BASE 13 May)
@@ -5227,7 +5233,7 @@ function drawEpPanel(){
       return `<div class="ep-bar3-seg ${s.cls}" data-val="${s.val}" data-cls="${s.cls}" style="width:${pct}%"><span class="seg-lbl-in">${s.val}</span></div>`;
     }).join('');
 
-    const ariaLabel = `${ep.ep}: ${ep.pending} pending, ${ep.allocated} allocated, ${ep.rejectedCancelled} rejected or cancelled, ${ep.total} total placements`;
+    const ariaLabel = `${ep.ep}: ${ep.pending} pending, ${ep.allocated} allocated, ${ep.rejectedCancelled} rejected, ${ep.total} total placements`;
 
     html += `<div class="ep-grid-row-v2">
       <div class="ep-row-name-v2">${ep.ep}</div>
@@ -6925,14 +6931,14 @@ function navigateToAllocOptions(rid){
     if(prefCountEl){
       const prefs = r.agencyPreferences;
       if(prefs && prefs.length && studs.length){
-        const visiblePrefs = prefs.filter(p=>!p.noAccess);
+        const visiblePrefs = prefs.filter(p=>!p.noAccess && p.status!=='rejected');
         const total = visiblePrefs.length;
         const allocated = prefs.find(p=>p.status==='allocated');
         let prefText = '';
         if(allocated){
-          prefText = `· Preferred agencies: ${total} · Allocated at Pref ${allocated.order}`;
+          prefText = `· Preferenced Agencies: ${total} · Allocated at Pref ${allocated.order}`;
         } else {
-          prefText = `· Preferred agencies: ${total}`;
+          prefText = `· Preferenced Agencies: ${total}`;
         }
         prefCountEl.textContent = prefText;
         prefCountEl.style.display = '';
@@ -7690,7 +7696,8 @@ function renderAgencyBlock(ag, focusReq, depth, isPinned){
   // any descendant has the request.
   const reqMeta = focusR;
   const reqHasSpecificAgency = !!(reqMeta && reqMeta.agencyName);
-  const showReqBadge = directlyHasReq || (!reqHasSpecificAgency && depth === 0 && isReqAg);
+  const hasPrefsThisReq = !!(focusR && focusR.agencyPreferences && focusR.agencyPreferences.length);
+  const showReqBadge = !hasPrefsThisReq && (directlyHasReq || (!reqHasSpecificAgency && depth === 0 && isReqAg));
 
   let html = `<div class="ag-row${isReqAg?' requested':''}${depth>0?' depth-'+depth:''}" id="ward-${ag.id}" onclick="toggleAllocAg('${ag.id}')" style="--ag-depth-indent:${pad}px">
     <div class="ag-row-left" id="rowleft-${ag.id}" style="padding-left:${pad}px">
@@ -8287,9 +8294,9 @@ function renderRegionTotalRow(agencies, focusReq, regionLabel){
   </div>`;
 }
 
-function renderOutOfRegionPrefStrip(outside, pad){
-  if(!outside.length) return '';
-  const n = outside.length;
+function renderOutOfRegionPrefStrip(outside, noAccess, pad){
+  const n = outside.length + noAccess.length;
+  if(!n) return '';
 
   const byRegion = {};
   const order = [];
@@ -8298,13 +8305,22 @@ function renderOutOfRegionPrefStrip(outside, pad){
     byRegion[p.region].push(p);
   });
 
-  const groupsHtml = order.map(region=>{
+  const regionGroupsHtml = order.map(region=>{
     const rows = byRegion[region].map(p=>`
       <div class="prp-row" style="padding-left:${pad+20}px">
         ${p.agencyName} · Pref ${p.order}
       </div>`).join('');
     return `<div class="pref-region-bar" style="padding-left:${pad}px"><span class="prb-label">${region}</span></div>${rows}`;
   }).join('');
+
+  // No-access rows never show agency name or region — just the rank, greyed and inert.
+  const noAccessHtml = noAccess.length ? `
+    <div class="pref-region-bar" style="padding-left:${pad}px"><span class="prb-label">Outside your access</span></div>
+    ${noAccess.map(p=>`
+      <div class="prp-row prp-row-noaccess" style="padding-left:${pad+20}px">
+        Preference ${p.order} — Outside your access
+      </div>`).join('')}
+  ` : '';
 
   return `
     <div class="pref-region-toggle" style="padding-left:${pad}px" onclick="
@@ -8314,9 +8330,9 @@ function renderOutOfRegionPrefStrip(outside, pad){
       ">
       <svg class="prt-chev" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg>
       <svg class="prt-eye" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 3l18 18M10.6 10.6a2 2 0 0 0 2.8 2.8M9.5 5.1A9.5 9.5 0 0 1 12 5c5 0 9 4 10 7a12.4 12.4 0 0 1-2.3 3.4M6.4 6.5A12.6 12.6 0 0 0 2 12c1 3 5 7 10 7 1.2 0 2.3-.2 3.4-.6"/></svg>
-      <span class="prt-text">${n} preferred agenc${n===1?'y':'ies'} in other regions</span>
+      <span class="prt-text">${n} hidden preference${n===1?'':'s'}</span>
     </div>
-    <div class="pref-region-groups" style="display:none">${groupsHtml}</div>
+    <div class="pref-region-groups" style="display:none">${regionGroupsHtml}${noAccessHtml}</div>
   `;
 }
 
@@ -8331,6 +8347,7 @@ function renderAllocRows(focusReqId){
 
   const prefs = focusReq && focusReq.agencyPreferences;
   const outsidePrefs = prefs ? prefs.filter(p=>p.outOfRegion && !p.noAccess && p.status!=='rejected') : [];
+  const noAccessPrefs = prefs ? prefs.filter(p=>p.noAccess && p.status!=='rejected') : [];
 
   // In-region preference agencies get pinned to the top of the grid, sorted
   // active-first (by PreferenceOrder), then rejected-after. The "current" agency
@@ -8378,10 +8395,10 @@ function renderAllocRows(focusReqId){
 
   if(prefBlockAgs.length){
     prefBlockAgs.forEach(ag=>{ html += renderAgencyBlock(ag, focusReq, 0, true); });
-    if(outsidePrefsFiltered.length) html += renderOutOfRegionPrefStrip(outsidePrefsFiltered, 8);
+    if(outsidePrefsFiltered.length || noAccessPrefs.length) html += renderOutOfRegionPrefStrip(outsidePrefsFiltered, noAccessPrefs, 8);
   } else if(requestedAgs.length){
     requestedAgs.forEach(ag=>{ html += renderAgencyBlock(ag, focusReq, 0, true); });
-    if(outsidePrefsFiltered.length) html += renderOutOfRegionPrefStrip(outsidePrefsFiltered, 8);
+    if(outsidePrefsFiltered.length || noAccessPrefs.length) html += renderOutOfRegionPrefStrip(outsidePrefsFiltered, noAccessPrefs, 8);
   }
 
   const filteredOthers = followedRegionLabel ? [] : otherAgs.filter(ag=>agencyMatchesAllocFilters(ag));
@@ -8690,11 +8707,11 @@ function reconcilePreferencesOnGenerate(r, generatedAgIds){
   });
   const prefCountEl = document.getElementById('allocPrefCount');
   if(prefCountEl){
-    const total = r.agencyPreferences.filter(p=>!p.noAccess).length;
+    const total = r.agencyPreferences.filter(p=>!p.noAccess && p.status!=='rejected').length;
     const allocatedPref = r.agencyPreferences.find(p=>p.status==='allocated');
     prefCountEl.textContent = allocatedPref
-      ? `· Preferred agencies: ${total} · Allocated at Pref ${allocatedPref.order}`
-      : `· Preferred agencies: ${total}`;
+      ? `· Preferenced Agencies: ${total} · Allocated at Pref ${allocatedPref.order}`
+      : `· Preferenced Agencies: ${total}`;
   }
 }
 
@@ -10886,7 +10903,7 @@ function closePlcDetail(){
   <div class="ep-legend" id="epLegend">
     <span class="ep-leg-item"><span class="ep-leg-dot" style="background:#a8a8a8"></span>Pending</span>
     <span class="ep-leg-item"><span class="ep-leg-dot" style="background:#93c47d"></span>Allocated</span>
-    <span class="ep-leg-item"><span class="ep-leg-dot" style="background:#e56767"></span>Rejected/Cancelled</span>
+    <span class="ep-leg-item"><span class="ep-leg-dot" style="background:#e56767"></span>Rejected</span>
   </div>
   <div class="ep-body" id="epBody">
     <div class="ep-empty">Load the grid to see EP fairness</div>
@@ -11503,11 +11520,11 @@ function rejectAgencyPreference(reqId, prefOrder){
   // Refresh preference count in request bar
   const prefCountEl = document.getElementById('allocPrefCount');
   if(prefCountEl && r.agencyPreferences){
-    const total = r.agencyPreferences.filter(p=>!p.noAccess).length;
+    const total = r.agencyPreferences.filter(p=>!p.noAccess && p.status!=='rejected').length;
     const allocatedPref = r.agencyPreferences.find(p=>p.status==='allocated');
     prefCountEl.textContent = allocatedPref
-      ? '· Preferred agencies: ' + total + ' · Allocated at Pref ' + allocatedPref.order
-      : '· Preferred agencies: ' + total;
+      ? '· Preferenced Agencies: ' + total + ' · Allocated at Pref ' + allocatedPref.order
+      : '· Preferenced Agencies: ' + total;
   }
 }
 
@@ -11522,21 +11539,35 @@ function openAllocReject(){
   const body = document.getElementById('allocRejectSummary');
 
   const activePrefs = (r.agencyPreferences||[]).filter(p=>p.status!=='rejected' && !p.noAccess);
-  const hiddenPrefCount = (r.agencyPreferences||[]).filter(p=>p.status!=='rejected' && p.noAccess).length;
+  const noAccessPrefsForPanel = (r.agencyPreferences||[]).filter(p=>p.status!=='rejected' && p.noAccess);
 
-  if(activePrefs.length){
+  if(activePrefs.length || noAccessPrefsForPanel.length){
     // Preference-aware panel: offer "try the next preference" before a full reject
-    const rows = activePrefs.map(p=>`
-      <tr>
-        <td class="arp-order">${p.order}</td>
-        <td><a class="arp-agency-link" href="#" onclick="return false;">${p.agencyName}</a></td>
-        <td class="arp-region-cell">${p.region || ''}</td>
-        <td class="arp-chk-cell"><input type="checkbox" class="arp-chk" value="${p.order}" onchange="_rejectPrefCheckChanged()"></td>
-      </tr>`).join('');
+    // No-access rows: visible, disabled, no agency/region disclosed — matches Felix's
+    // decision to show these as inert rows rather than a summary note.
+    const combined = [
+      ...activePrefs.map(p=>({order:p.order, actionable:true, p})),
+      ...noAccessPrefsForPanel.map(p=>({order:p.order, actionable:false, p}))
+    ].sort((a,b)=>a.order-b.order);
 
-    const hiddenNote = hiddenPrefCount
-      ? `<div class="alloc-reject-hidden-note">${hiddenPrefCount} more preference${hiddenPrefCount!==1?'s':''} may exist that you don't have access to view.</div>`
-      : '';
+    const rows = combined.map(item=>{
+      if(item.actionable){
+        const p = item.p;
+        return `<tr>
+          <td class="arp-order">${p.order}</td>
+          <td><a class="arp-agency-link" href="#" onclick="return false;">${p.agencyName}</a></td>
+          <td class="arp-region-cell">${p.region || ''}</td>
+          <td class="arp-chk-cell"><input type="checkbox" class="arp-chk" value="${p.order}" onchange="_rejectPrefCheckChanged()"></td>
+        </tr>`;
+      } else {
+        const p = item.p;
+        return `<tr class="arp-row-noaccess">
+          <td class="arp-order">${p.order}</td>
+          <td colspan="2" class="arp-noaccess-lbl">Outside your access</td>
+          <td class="arp-chk-cell"><input type="checkbox" disabled title="You don't have access to act on this preference"></td>
+        </tr>`;
+      }
+    }).join('');
 
     body.innerHTML = `
       <div class="arp-infobar">
@@ -11548,7 +11579,13 @@ function openAllocReject(){
         <thead><tr><th>#</th><th>Agency</th><th>Region</th><th class="arp-col-reject">Reject</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
-      ${hiddenNote}
+      <div class="arp-scenario-note">
+        <strong>Open scenario for grooming</strong> — the reject-walk picks the next preference strictly by rank, regardless of the acting coordinator's access. So it's possible to reject your way onto a preference you can't view or act on at all.
+        <br><br>
+        <em>Example:</em> preferences 1–4 are visible, preference 5 is outside your access. If a coordinator rejects preferences 1–4 in sequence, the request advances to preference 5 — a toast confirms this ("The request has advanced to the next student preference, which is outside your access"), but there's nothing left to action on this screen.
+        <br><br>
+        <em>Suggested approach:</em> rather than leaving the coordinator on a now-inert screen, or forcing an automatic redirect, return them to wherever they entered from (their request list/grid) with that same message — a deliberate, explained exit rather than either a dead-end or a silent one.
+      </div>
     `;
     ftr.innerHTML = `
       <button class="alloc-reject-cancel" onclick="closeAllocRejectPanel()">Cancel</button>
@@ -11642,32 +11679,39 @@ function allocConfirmRejectSelectedPrefs(){
   });
 
   const nextPref = r.agencyPreferences
-    .filter(p=>p.status!=='rejected' && !p.noAccess)
+    .filter(p=>p.status!=='rejected')
     .sort((a,b)=>a.order-b.order)[0];
-  const nextIsNoAccess = !nextPref && r.agencyPreferences.some(p=>p.status!=='rejected' && p.noAccess);
 
   // Move the "current agency" pointer — this is what relocates the Requested badge
   // and re-sorts the pinned block on next render. If the next preference is out of the
   // modeled region, renderAllocRows will build a stand-in row and refresh the grid to it.
-  r.currentAgencyId = nextPref ? nextPref.agencyId : null;
+  // If it's outside the coordinator's access entirely, there's nothing left for them to
+  // act on here — see the noAccess branch below.
+  r.currentAgencyId = (nextPref && !nextPref.noAccess) ? nextPref.agencyId : null;
 
   closeAllocRejectPanel();
-  renderAllocRows(currentAllocReqId);
 
   const prefCountEl = document.getElementById('allocPrefCount');
   if(prefCountEl){
-    const total = r.agencyPreferences.filter(p=>!p.noAccess).length;
-    prefCountEl.textContent = `· Preferred agencies: ${total}`;
+    const total = r.agencyPreferences.filter(p=>!p.noAccess && p.status!=='rejected').length;
+    prefCountEl.textContent = `· Preferenced Agencies: ${total}`;
   }
 
-  if(nextPref){
+  if(nextPref && nextPref.noAccess){
+    showAllocToast('Preference rejected successfully', 'The request has advanced to the next student preference, which is outside your access.');
+  }
+
+  renderAllocRows(currentAllocReqId);
+
+  if(nextPref && nextPref.noAccess){
+    // Intentionally left here — see the scenario note in the Reject panel for the
+    // open question on what should happen next (grooming discussion, not resolved).
+  } else if(nextPref){
     if(nextPref.outOfRegion){
       showAllocToast('Preference rejected successfully', `Request now sits with Pref ${nextPref.order} — ${nextPref.agencyName}, outside your current region (${nextPref.region}).`);
     } else {
       showAllocToast('Preference rejected successfully', `Request now sits with Pref ${nextPref.order} — ${nextPref.agencyName}.`);
     }
-  } else if(nextIsNoAccess){
-    showAllocToast('Preference rejected successfully', 'The next preference is for an agency you don\'t have access to view.');
   } else {
     showAllocToast('Preference rejected successfully', 'Every agency preference on this request has now been rejected.');
   }
