@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -786,60 +787,40 @@ th,td{border:1px solid #e8e8e8;padding:0}
 .ep-leg-dot{width:11px;height:11px;border-radius:2px;flex-shrink:0}
 .ep-body{flex:1;overflow-y:auto;padding:0}
 .ep-empty{padding:32px 24px;text-align:center;color:#bbb;font-size:12px}
-/* EP grid rows */
-.ep-grid-hdr,.ep-grid-row,.ep-scale{
-  display:grid;
-  grid-template-columns:140px 1fr 52px;
-  column-gap:16px;
-  align-items:center;
-  padding:0 24px;
+/* ── EP Balance v2 — 3-bucket, no axis, inline labels (rework per Felix/Shae feedback, Jul 2026) ── */
+.ep-grid-hdr-v2{
+  padding:10px 24px 6px;font-size:10px;font-weight:600;letter-spacing:.05em;
+  color:#888;text-transform:uppercase;border-bottom:1px solid #e8e8e8;
 }
-.ep-grid-hdr{
-  padding-top:10px;padding-bottom:6px;
-  border-bottom:1px solid #e8e8e8;
-  font-size:10px;font-weight:600;letter-spacing:.05em;
-  color:#aaa;text-transform:uppercase;
+.ep-grid-row-v2{display:flex;align-items:center;padding:11px 24px;border-bottom:1px solid #f5f5f5;gap:12px}
+.ep-grid-row-v2:last-child{border-bottom:none}
+.ep-row-name-v2{
+  font-size:13px;font-weight:700;color:#1a1a1a;width:160px;flex-shrink:0;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
-.ep-grid-row{padding-top:12px;padding-bottom:12px;border-bottom:1px solid #f5f5f5}
-.ep-grid-row:last-child{border-bottom:none}
-.ep-row-name{font-size:13px;font-weight:600;color:#1a1a1a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ep-row-meta{font-size:11px;color:#777;margin-top:2px;white-space:normal;line-height:1.4}
-/* Bar */
-.ep-bar-wrap{position:relative;height:20px}
-.ep-bar-track{position:absolute;inset:5px 0;background:#f1f5f9;border-radius:2px}
-.ep-bar-seg{position:absolute;top:5px;height:10px;border-radius:1px}
-/* Totals */
-.ep-total-num,.ep-ytd-num{font-size:13px;font-weight:700;color:#1a1a1a;text-align:right;display:block;font-variant-numeric:tabular-nums}
-.ep-total-lbl,.ep-ytd-lbl{font-size:9px;color:#aaa;text-transform:uppercase;letter-spacing:.04em;text-align:right;display:block;margin-top:1px}
-.ep-col-total,.ep-col-ytd{text-align:right;white-space:nowrap}
-/* Priority flag */
-.ep-flag{display:block;text-align:center;font-size:10px;font-weight:600;padding:3px 6px;border-radius:4px;white-space:nowrap}
-.ep-flag-warn{background:#fef3c7;color:#92400e}
-.ep-flag-review{background:#fee2e2;color:#991b1b}
-.ep-flag-ok{background:#d1fae5;color:#065f46}
-.ep-flag-neutral{background:#f1f5f9;color:#475569}
-/* Scale ticks */
-.ep-scale{padding-top:0;padding-bottom:6px}
-.ep-tick{
-  position:absolute;top:3px;
-  font-size:9px;color:#aaa;
-  transform:translateX(-50%);
+.ep-bar3-row{display:flex;align-items:center;gap:8px;flex:1;min-width:0}
+.ep-bar3-track{
+  flex:1;display:flex;height:24px;border-radius:3px;overflow:hidden;
+  min-width:0;
+}
+.ep-bar3-seg{
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:700;white-space:nowrap;height:100%;
   font-variant-numeric:tabular-nums;
-  white-space:nowrap;
 }
-.ep-tick::before{
-  content:'';position:absolute;top:-5px;left:50%;
-  width:1px;height:4px;background:#ddd;
-  transform:translateX(-50%);
+.ep-bar3-seg.pending{background:#a8a8a8;color:#1a1a1a}
+.ep-bar3-seg.allocated{background:#93c47d;color:#1a1a1a}
+.ep-bar3-seg.rejected{background:#e56767;color:#1a1a1a}
+.ep-bar3-seg .seg-lbl-in{padding:0 4px}
+.ep-bar3-outside{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.ep-seg-lbl-out{font-size:11px;font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums}
+.ep-seg-lbl-out.pending{color:#616161}
+.ep-seg-lbl-out.allocated{color:#1b5e20}
+.ep-seg-lbl-out.rejected{color:#7f0000}
+.ep-bar3-total{
+  font-size:13px;font-weight:700;color:#1a1a1a;flex-shrink:0;
+  min-width:30px;text-align:right;font-variant-numeric:tabular-nums;
 }
-/* Grid lines on bar track for visual alignment with scale */
-.ep-bar-track::before,.ep-bar-track::after{
-  content:'';position:absolute;top:0;bottom:0;width:1px;background:rgba(0,0,0,0.06);
-}
-.ep-bar-track::before{left:25%}
-.ep-bar-track::after{left:50%}
-.ep-bar-guideline-75{position:absolute;top:5px;bottom:5px;left:75%;width:1px;background:rgba(0,0,0,0.06);pointer-events:none}
-.ep-col-bar{position:relative}
 
 
 /* ── SLIDE NAVIGATION SHELL ── */
@@ -5209,84 +5190,75 @@ function getAllReqs(){
 }
 
 
+// Rolls the 5 underlying slot-count metrics from computeEpData() into the
+// 3 confirmed buckets: Pending | Allocated (Planned+Offered/Published roll-up) | Rejected/Cancelled
+function computeEpData3Bucket(){
+  return computeEpData().map(ep => {
+    const allocated = ep.planned + ep.offered;
+    const rejectedCancelled = ep.rejected + ep.cancelled;
+    const total = ep.pending + allocated + rejectedCancelled;
+    return { ep: ep.ep, pending: ep.pending, allocated, rejectedCancelled, total };
+  }).sort((a,b) => b.pending - a.pending); // most pending first (retained from original AC)
+}
+
 function drawEpPanel(){
-  const data = computeEpData();
+  const data = computeEpData3Bucket();
   const body = document.getElementById('epBody');
   if(!data.length){ body.innerHTML='<div class="ep-empty">No EP data for current filters</div>'; return; }
 
-  // Shared scale: max across all 5 metrics summed per EP
-  const maxRaw = Math.max(...data.map(ep =>
-    ep.pending + ep.rejected + ep.planned + ep.offered + ep.cancelled
-  ), 1);
-  const scaleMax = Math.ceil(maxRaw / 5) * 5;
+  // Shared scale across all EPs so bar length stays comparable (no axis shown, but
+  // relative proportion is preserved). 15% headroom keeps the longest bar from
+  // touching the total number, matching the Response Satisfaction reference.
+  const maxTotal = Math.max(...data.map(d => d.total), 1);
+  const scaleMax = maxTotal * 1.15;
 
-  const tickPcts = [0, 25, 50, 75, 100];
-  const scaleTicks = tickPcts.map(pct => {
-    const val = Math.round((pct / 100) * scaleMax);
-    return `<span class="ep-tick" style="left:${pct}%">${val}</span>`;
-  }).join('');
-
-  let html = `<div class="ep-grid-hdr">
-    <div class="ep-col-ep">EP</div>
-    <div class="ep-col-bar">Placements</div>
-    <div class="ep-col-total" style="white-space:nowrap">Total</div>
-  </div>`;
+  let html = `<div class="ep-grid-hdr-v2">Education providers</div>`;
 
   data.forEach(ep => {
-    // Sub-text shows request counts — hide zero values
-    const reqParts = [];
-    if(ep.req_pending)  reqParts.push(`${ep.req_pending} pending`);
-    if(ep.req_offered)  reqParts.push(`${ep.req_offered} offered`);
-    if(ep.req_rejected) reqParts.push(`${ep.req_rejected} rejected`);
-    const metaText = reqParts.length ? 'Requests: ' + reqParts.join(' · ') : '';
+    const segs = [
+      { cls:'pending',   val: ep.pending },
+      { cls:'allocated', val: ep.allocated },
+      { cls:'rejected',  val: ep.rejectedCancelled }
+    ];
+    // Zero-value buckets are omitted entirely rather than shown as empty segments
+    const segHtml = segs.map(s => {
+      if(s.val <= 0) return '';
+      const pct = (s.val / scaleMax) * 100;
+      return `<div class="ep-bar3-seg ${s.cls}" data-val="${s.val}" data-cls="${s.cls}" style="width:${pct}%"><span class="seg-lbl-in">${s.val}</span></div>`;
+    }).join('');
 
-    const total = ep.pending + ep.rejected + ep.planned + ep.offered + ep.cancelled;
+    const ariaLabel = `${ep.ep}: ${ep.pending} pending, ${ep.allocated} allocated, ${ep.rejectedCancelled} rejected or cancelled, ${ep.total} total placements`;
 
-    // Bar segment widths (% of scaleMax) — order: Pending | Planned | Offered | Rejected | Cancelled
-    const pW  = Math.round((ep.pending   / scaleMax) * 100);
-    const plW = Math.round((ep.planned   / scaleMax) * 100);
-    const oW  = Math.round((ep.offered   / scaleMax) * 100);
-    const rW  = Math.round((ep.rejected  / scaleMax) * 100);
-    const cW  = Math.round((ep.cancelled / scaleMax) * 100);
-
-    // Left offsets
-    const plL = pW;
-    const oL  = pW + plW;
-    const rL  = pW + plW + oW;
-    const cL  = pW + plW + oW + rW;
-
-    html += `<div class="ep-grid-row">
-      <div class="ep-col-ep">
-        <div class="ep-row-name">${ep.ep}</div>
-        ${metaText ? `<div class="ep-row-meta">${metaText}</div>` : ''}
-      </div>
-      <div class="ep-col-bar">
-        <div class="ep-bar-wrap">
-          <div class="ep-bar-guideline-75"></div>
-          <div class="ep-bar-seg" style="width:${pW}%;background:rgba(198,40,40,0.25);left:0" title="${ep.pending} pending"></div>
-          <div class="ep-bar-seg" style="width:${plW}%;background:rgba(33,150,243,0.3);left:${plL}%" title="${ep.planned} planned"></div>
-          <div class="ep-bar-seg" style="width:${oW}%;background:rgba(255,152,0,0.35);left:${oL}%" title="${ep.offered} offered (all placements excl. cancelled &amp; planned)"></div>
-          <div class="ep-bar-seg" style="width:${rW}%;background:rgba(80,80,80,0.25);left:${rL}%" title="${ep.rejected} rejected"></div>
-          <div class="ep-bar-seg" style="width:${cW}%;background:rgba(158,158,158,0.25);left:${cL}%" title="${ep.cancelled} cancelled"></div>
-        </div>
-      </div>
-      <div class="ep-col-total">
-        <span class="ep-total-num">${total}</span>
-        <span class="ep-total-lbl">Plcs</span>
+    html += `<div class="ep-grid-row-v2">
+      <div class="ep-row-name-v2">${ep.ep}</div>
+      <div class="ep-bar3-row">
+        <div class="ep-bar3-track" role="img" aria-label="${ariaLabel}">${segHtml}</div>
+        <div class="ep-bar3-outside"></div>
+        <div class="ep-bar3-total">${ep.total}</div>
       </div>
     </div>`;
   });
 
-  // Scale axis row — sits below all EP rows
-  html += `<div class="ep-scale">
-    <div></div>
-    <div class="ep-col-bar" style="position:relative;height:16px;border-top:1px solid #e8e8e8;margin-top:4px">
-      ${scaleTicks}
-    </div>
-    <div></div>
-  </div>`;
-
   body.innerHTML = html;
+
+  // Post-render pass: any segment too narrow to legibly hold its number moves
+  // the label outside the bar instead (matches reference pattern, e.g. "4 2"
+  // sitting beside a thin segment rather than clipped/overlapping inside it).
+  requestAnimationFrame(() => {
+    body.querySelectorAll('.ep-grid-row-v2').forEach(row => {
+      const outside = row.querySelector('.ep-bar3-outside');
+      row.querySelectorAll('.ep-bar3-seg').forEach(seg => {
+        if(seg.offsetWidth < 22){
+          const inner = seg.querySelector('.seg-lbl-in');
+          if(inner) inner.style.visibility = 'hidden';
+          const out = document.createElement('span');
+          out.className = 'ep-seg-lbl-out ' + seg.getAttribute('data-cls');
+          out.textContent = seg.getAttribute('data-val');
+          outside.appendChild(out);
+        }
+      });
+    });
+  });
 }
 
 function setEpView(v){ drawEpPanel(); }
@@ -10912,11 +10884,9 @@ function closePlcDetail(){
     <button class="ep-close" onclick="toggleEp()" title="Close">×</button>
   </div>
   <div class="ep-legend" id="epLegend">
-    <span class="ep-leg-item"><span class="ep-leg-dot" style="background:rgba(198,40,40,0.25)"></span>Pending</span>
-    <span class="ep-leg-item"><span class="ep-leg-dot" style="background:rgba(255,152,0,0.35)"></span>Offered</span>
-    <span class="ep-leg-item"><span class="ep-leg-dot" style="background:rgba(33,150,243,0.3)"></span>Planned</span>
-    <span class="ep-leg-item"><span class="ep-leg-dot" style="background:rgba(80,80,80,0.25)"></span>Rejected</span>
-    <span class="ep-leg-item"><span class="ep-leg-dot" style="background:rgba(158,158,158,0.25)"></span>Cancelled</span>
+    <span class="ep-leg-item"><span class="ep-leg-dot" style="background:#a8a8a8"></span>Pending</span>
+    <span class="ep-leg-item"><span class="ep-leg-dot" style="background:#93c47d"></span>Allocated</span>
+    <span class="ep-leg-item"><span class="ep-leg-dot" style="background:#e56767"></span>Rejected/Cancelled</span>
   </div>
   <div class="ep-body" id="epBody">
     <div class="ep-empty">Load the grid to see EP fairness</div>
